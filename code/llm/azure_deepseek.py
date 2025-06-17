@@ -10,7 +10,10 @@ Backwards compatibility is not guaranteed at this time.
 """
 
 import json
-from openai import AsyncAzureOpenAI
+import asyncio
+from azure.ai.inference.aio import ChatCompletionsClient
+from azure.core.credentials import AzureKeyCredential
+from azure.ai.inference.models import SystemMessage, UserMessage, JsonSchemaFormat
 import os
 from config.config import CONFIG
 import asyncio
@@ -70,7 +73,7 @@ class DeepSeekAzureProvider(LLMProvider):
         return None
 
     @classmethod
-    def get_client(cls) -> AsyncAzureOpenAI:
+    def get_client(cls) -> ChatCompletionsClient:
         """Get or create DeepSeek Azure client"""
         with cls._client_lock:
             if cls._client is None:
@@ -85,11 +88,10 @@ class DeepSeekAzureProvider(LLMProvider):
                     raise ValueError(error_msg)
                     
                 try:
-                    cls._client = AsyncAzureOpenAI(
-                        azure_endpoint=endpoint,
-                        api_key=api_key,
+                    cls._client = ChatCompletionsClient(
+                        endpoint=endpoint,
+                        credential=AzureKeyCredential(api_key),
                         api_version=api_version,
-                        timeout=30.0
                     )
                     logger.info("DeepSeek Azure client initialized successfully")
                 except Exception as e:
@@ -148,15 +150,20 @@ Only output the JSON object itself, with no markdown formatting, no explanations
         
         try:
             response = await asyncio.wait_for(
-                client.chat.completions.create(
+                client.complete(
                     messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": prompt}
+                        SystemMessage(content=system_prompt),
+                        UserMessage(content=prompt)
                     ],
                     model=model,
                     temperature=temperature,
                     max_tokens=max_tokens,
-                    response_format={"type": "json_object"}  # Force JSON response
+                    # response_format=JsonSchemaFormat(
+                    #     name="Response_JSON_Schema",
+                    #     schema=schema,
+                    #     description="",
+                    #     strict=True,
+                    # ), # only works for api_version 2024-08-01 and later
                 ),
                 timeout=timeout
             )

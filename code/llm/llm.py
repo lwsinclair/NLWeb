@@ -131,7 +131,6 @@ def _get_provider(llm_type: str):
             _loaded_providers[llm_type] = huggingface_provider
         else:
             raise ValueError(f"Unknown LLM type: {llm_type}")
-            
         return _loaded_providers[llm_type]
     except ImportError as e:
         logger.error(f"Failed to import provider for {llm_type}: {e}")
